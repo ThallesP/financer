@@ -86,4 +86,8 @@ for (const account of accounts.results) {
 
 		page++;
 	}
+
+	log.info("Finished", {
+		accountId: account.id,
+	});
 }
