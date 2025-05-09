@@ -1,0 +1,905 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model accounts {
+  id                     String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subtype                String?         @db.VarChar
+  family_id              String          @db.Uuid
+  name                   String?         @db.VarChar
+  created_at             DateTime        @db.Timestamp(6)
+  updated_at             DateTime        @db.Timestamp(6)
+  accountable_type       String?         @db.VarChar
+  accountable_id         String?         @db.Uuid
+  balance                Decimal?        @db.Decimal(19, 4)
+  currency               String?         @db.VarChar
+  is_active              Boolean         @default(true)
+  classification         String?         @default(dbgenerated("\nCASE\n    WHEN ((accountable_type)::text = ANY (ARRAY[('Loan'::character varying)::text, ('CreditCard'::character varying)::text, ('OtherLiability'::character varying)::text])) THEN 'liability'::text\n    ELSE 'asset'::text\nEND")) @db.VarChar
+  import_id              String?         @db.Uuid
+  plaid_account_id       String?         @db.Uuid
+  scheduled_for_deletion Boolean?        @default(false)
+  last_synced_at         DateTime?       @db.Timestamp(6)
+  cash_balance           Decimal?        @default(0.0) @db.Decimal(19, 4)
+  locked_attributes      Json?           @default("{}")
+  families               families        @relation(fields: [family_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_363bf5a48d")
+  imports                imports?        @relation(fields: [import_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_86697e7a91")
+  plaid_accounts         plaid_accounts? @relation(fields: [plaid_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_9d788ddfbc")
+  balances               balances[]
+  entries                entries[]
+  holdings               holdings[]
+
+  @@index([accountable_id, accountable_type], map: "index_accounts_on_accountable_id_and_accountable_type")
+  @@index([accountable_type], map: "index_accounts_on_accountable_type")
+  @@index([family_id], map: "index_accounts_on_family_id")
+  @@index([family_id, accountable_type], map: "index_accounts_on_family_id_and_accountable_type")
+  @@index([family_id, id], map: "index_accounts_on_family_id_and_id")
+  @@index([import_id], map: "index_accounts_on_import_id")
+  @@index([plaid_account_id], map: "index_accounts_on_plaid_account_id")
+}
+
+model active_storage_attachments {
+  id                   String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                 String               @db.VarChar
+  record_type          String               @db.VarChar
+  record_id            String               @db.Uuid
+  blob_id              String               @db.Uuid
+  created_at           DateTime             @db.Timestamp(6)
+  active_storage_blobs active_storage_blobs @relation(fields: [blob_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_c3b3935057")
+
+  @@unique([record_type, record_id, name, blob_id], map: "index_active_storage_attachments_uniqueness")
+  @@index([blob_id], map: "index_active_storage_attachments_on_blob_id")
+}
+
+model active_storage_blobs {
+  id                             String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key                            String                           @unique(map: "index_active_storage_blobs_on_key") @db.VarChar
+  filename                       String                           @db.VarChar
+  content_type                   String?                          @db.VarChar
+  metadata                       String?
+  service_name                   String                           @db.VarChar
+  byte_size                      BigInt
+  checksum                       String?                          @db.VarChar
+  created_at                     DateTime                         @db.Timestamp(6)
+  active_storage_attachments     active_storage_attachments[]
+  active_storage_variant_records active_storage_variant_records[]
+}
+
+model active_storage_variant_records {
+  id                   String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  blob_id              String               @db.Uuid
+  variation_digest     String               @db.VarChar
+  active_storage_blobs active_storage_blobs @relation(fields: [blob_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_993965df05")
+
+  @@unique([blob_id, variation_digest], map: "index_active_storage_variant_records_uniqueness")
+}
+
+model addresses {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  addressable_type String?  @db.VarChar
+  addressable_id   String?  @db.Uuid
+  line1            String?  @db.VarChar
+  line2            String?  @db.VarChar
+  county           String?  @db.VarChar
+  locality         String?  @db.VarChar
+  region           String?  @db.VarChar
+  country          String?  @db.VarChar
+  postal_code      Int?
+  created_at       DateTime @db.Timestamp(6)
+  updated_at       DateTime @db.Timestamp(6)
+
+  @@index([addressable_type, addressable_id], map: "index_addresses_on_addressable")
+}
+
+model ar_internal_metadata {
+  key        String   @id @db.VarChar
+  value      String?  @db.VarChar
+  created_at DateTime @db.Timestamp(6)
+  updated_at DateTime @db.Timestamp(6)
+}
+
+model balances {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  account_id   String   @db.Uuid
+  date         DateTime @db.Date
+  balance      Decimal  @db.Decimal(19, 4)
+  currency     String   @default("USD") @db.VarChar
+  created_at   DateTime @db.Timestamp(6)
+  updated_at   DateTime @db.Timestamp(6)
+  cash_balance Decimal? @default(0.0) @db.Decimal(19, 4)
+  accounts     accounts @relation(fields: [account_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_rails_9452e1f8fd")
+
+  @@unique([account_id, date, currency], map: "index_account_balances_on_account_id_date_currency_unique")
+  @@index([account_id], map: "index_balances_on_account_id")
+}
+
+model budget_categories {
+  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  budget_id         String     @db.Uuid
+  category_id       String     @db.Uuid
+  budgeted_spending Decimal    @db.Decimal(19, 4)
+  currency          String     @db.VarChar
+  created_at        DateTime   @db.Timestamp(6)
+  updated_at        DateTime   @db.Timestamp(6)
+  categories        categories @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_83cbbb6bcc")
+  budgets           budgets    @relation(fields: [budget_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_a928ada795")
+
+  @@unique([budget_id, category_id], map: "index_budget_categories_on_budget_id_and_category_id")
+  @@index([budget_id], map: "index_budget_categories_on_budget_id")
+  @@index([category_id], map: "index_budget_categories_on_category_id")
+}
+
+model budgets {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  family_id         String              @db.Uuid
+  start_date        DateTime            @db.Date
+  end_date          DateTime            @db.Date
+  budgeted_spending Decimal?            @db.Decimal(19, 4)
+  expected_income   Decimal?            @db.Decimal(19, 4)
+  currency          String              @db.VarChar
+  created_at        DateTime            @db.Timestamp(6)
+  updated_at        DateTime            @db.Timestamp(6)
+  budget_categories budget_categories[]
+  families          families            @relation(fields: [family_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_d298be5805")
+
+  @@unique([family_id, start_date, end_date], map: "index_budgets_on_family_id_and_start_date_and_end_date")
+  @@index([family_id], map: "index_budgets_on_family_id")
+}
+
+model categories {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String              @db.VarChar
+  color             String              @default("#6172F3") @db.VarChar
+  family_id         String              @db.Uuid
+  created_at        DateTime            @db.Timestamp(6)
+  updated_at        DateTime            @db.Timestamp(6)
+  parent_id         String?             @db.Uuid
+  classification    String              @default("expense") @db.VarChar
+  lucide_icon       String              @default("shapes") @db.VarChar
+  budget_categories budget_categories[]
+  families          families            @relation(fields: [family_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_22ababf336")
+  transactions      transactions[]
+
+  @@index([family_id], map: "index_categories_on_family_id")
+}
+
+model chats {
+  id                                     String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                                String     @db.Uuid
+  title                                  String     @db.VarChar
+  instructions                           String?    @db.VarChar
+  error                                  Json?
+  latest_assistant_response_id           String?    @db.VarChar
+  created_at                             DateTime   @db.Timestamp(6)
+  updated_at                             DateTime   @db.Timestamp(6)
+  users_chats_user_idTousers             users      @relation("chats_user_idTousers", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_e555f43151")
+  messages                               messages[]
+  users_users_last_viewed_chat_idTochats users[]    @relation("users_last_viewed_chat_idTochats")
+
+  @@index([user_id], map: "index_chats_on_user_id")
+}
+
+model credit_cards {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime  @db.Timestamp(6)
+  updated_at        DateTime  @db.Timestamp(6)
+  available_credit  Decimal?  @db.Decimal(10, 2)
+  minimum_payment   Decimal?  @db.Decimal(10, 2)
+  apr               Decimal?  @db.Decimal(10, 2)
+  expiration_date   DateTime? @db.Date
+  annual_fee        Decimal?  @db.Decimal(10, 2)
+  locked_attributes Json?     @default("{}")
+}
+
+model cryptos {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime @db.Timestamp(6)
+  updated_at        DateTime @db.Timestamp(6)
+  locked_attributes Json?    @default("{}")
+}
+
+model data_enrichments {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  enrichable_type String   @db.VarChar
+  enrichable_id   String   @db.Uuid
+  source          String?  @db.VarChar
+  attribute_name  String?  @db.VarChar
+  value           Json?
+  metadata        Json?
+  created_at      DateTime @db.Timestamp(6)
+  updated_at      DateTime @db.Timestamp(6)
+
+  @@unique([enrichable_id, enrichable_type, source, attribute_name], map: "idx_on_enrichable_id_enrichable_type_source_attribu_5be5f63e08")
+  @@index([enrichable_type, enrichable_id], map: "index_data_enrichments_on_enrichable")
+}
+
+model depositories {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime @db.Timestamp(6)
+  updated_at        DateTime @db.Timestamp(6)
+  locked_attributes Json?    @default("{}")
+}
+
+model entries {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  account_id        String    @db.Uuid
+  entryable_type    String?   @db.VarChar
+  entryable_id      String?   @db.Uuid
+  amount            Decimal?  @db.Decimal(19, 4)
+  currency          String?   @db.VarChar
+  date              DateTime? @db.Date
+  name              String    @db.VarChar
+  created_at        DateTime  @db.Timestamp(6)
+  updated_at        DateTime  @db.Timestamp(6)
+  import_id         String?   @db.Uuid
+  notes             String?
+  excluded          Boolean?  @default(false)
+  plaid_id          String?   @db.VarChar
+  locked_attributes Json?     @default("{}")
+  accounts          accounts  @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_37a3feaeb6")
+  imports           imports?  @relation(fields: [import_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_f8a7316f9a")
+
+  @@index([account_id], map: "index_entries_on_account_id")
+  @@index([import_id], map: "index_entries_on_import_id")
+}
+
+model exchange_rates {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  from_currency String   @db.VarChar
+  to_currency   String   @db.VarChar
+  rate          Decimal  @db.Decimal
+  date          DateTime @db.Date
+  created_at    DateTime @db.Timestamp(6)
+  updated_at    DateTime @db.Timestamp(6)
+
+  @@unique([from_currency, to_currency, date], map: "index_exchange_rates_on_base_converted_date_unique")
+  @@index([from_currency], map: "index_exchange_rates_on_from_currency")
+  @@index([to_currency], map: "index_exchange_rates_on_to_currency")
+}
+
+model families {
+  id                      String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                    String?         @db.VarChar
+  created_at              DateTime        @db.Timestamp(6)
+  updated_at              DateTime        @db.Timestamp(6)
+  currency                String?         @default("USD") @db.VarChar
+  locale                  String?         @default("en") @db.VarChar
+  stripe_customer_id      String?         @db.VarChar
+  date_format             String?         @default("%m-%d-%Y") @db.VarChar
+  country                 String?         @default("US") @db.VarChar
+  last_synced_at          DateTime?       @db.Timestamp(6)
+  timezone                String?         @db.VarChar
+  data_enrichment_enabled Boolean?        @default(false)
+  early_access            Boolean?        @default(false)
+  accounts                accounts[]
+  budgets                 budgets[]
+  categories              categories[]
+  imports                 imports[]
+  invitations             invitations[]
+  merchants               merchants[]
+  plaid_items             plaid_items[]
+  rules                   rules[]
+  subscriptions           subscriptions[]
+  tags                    tags[]
+  users                   users[]
+}
+
+model holdings {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  account_id  String     @db.Uuid
+  security_id String     @db.Uuid
+  date        DateTime   @db.Date
+  qty         Decimal    @db.Decimal(19, 4)
+  price       Decimal    @db.Decimal(19, 4)
+  amount      Decimal    @db.Decimal(19, 4)
+  currency    String     @db.VarChar
+  created_at  DateTime   @db.Timestamp(6)
+  updated_at  DateTime   @db.Timestamp(6)
+  securities  securities @relation(fields: [security_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_cd86ce9d77")
+  accounts    accounts   @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_ef2ad271e6")
+
+  @@unique([account_id, security_id, date, currency], map: "idx_on_account_id_security_id_date_currency_5323e39f8b")
+  @@index([account_id], map: "index_holdings_on_account_id")
+  @@index([security_id], map: "index_holdings_on_security_id")
+}
+
+model impersonation_session_logs {
+  id                       String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  impersonation_session_id String                 @db.Uuid
+  controller               String?                @db.VarChar
+  action                   String?                @db.VarChar
+  path                     String?
+  method                   String?                @db.VarChar
+  ip_address               String?                @db.VarChar
+  user_agent               String?
+  created_at               DateTime               @db.Timestamp(6)
+  updated_at               DateTime               @db.Timestamp(6)
+  impersonation_sessions   impersonation_sessions @relation(fields: [impersonation_session_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_2ea2f2adc5")
+
+  @@index([impersonation_session_id], map: "index_impersonation_session_logs_on_impersonation_session_id")
+}
+
+model impersonation_sessions {
+  id                                                  String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  impersonator_id                                     String                       @db.Uuid
+  impersonated_id                                     String                       @db.Uuid
+  status                                              String                       @default("pending") @db.VarChar
+  created_at                                          DateTime                     @db.Timestamp(6)
+  updated_at                                          DateTime                     @db.Timestamp(6)
+  impersonation_session_logs                          impersonation_session_logs[]
+  users_impersonation_sessions_impersonator_idTousers users                        @relation("impersonation_sessions_impersonator_idTousers", fields: [impersonator_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_2b92af2e4a")
+  users_impersonation_sessions_impersonated_idTousers users                        @relation("impersonation_sessions_impersonated_idTousers", fields: [impersonated_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_cca4e14dea")
+  sessions                                            sessions[]
+
+  @@index([impersonated_id], map: "index_impersonation_sessions_on_impersonated_id")
+  @@index([impersonator_id], map: "index_impersonation_sessions_on_impersonator_id")
+}
+
+model import_mappings {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type              String   @db.VarChar
+  key               String?  @db.VarChar
+  value             String?  @db.VarChar
+  create_when_empty Boolean? @default(true)
+  import_id         String   @db.Uuid
+  mappable_type     String?  @db.VarChar
+  mappable_id       String?  @db.Uuid
+  created_at        DateTime @db.Timestamp(6)
+  updated_at        DateTime @db.Timestamp(6)
+
+  @@index([import_id], map: "index_import_mappings_on_import_id")
+  @@index([mappable_type, mappable_id], map: "index_import_mappings_on_mappable")
+}
+
+model import_rows {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  import_id              String   @db.Uuid
+  account                String?  @db.VarChar
+  date                   String?  @db.VarChar
+  qty                    String?  @db.VarChar
+  ticker                 String?  @db.VarChar
+  price                  String?  @db.VarChar
+  amount                 String?  @db.VarChar
+  currency               String?  @db.VarChar
+  name                   String?  @db.VarChar
+  category               String?  @db.VarChar
+  tags                   String?  @db.VarChar
+  entity_type            String?  @db.VarChar
+  notes                  String?
+  created_at             DateTime @db.Timestamp(6)
+  updated_at             DateTime @db.Timestamp(6)
+  exchange_operating_mic String?  @db.VarChar
+  imports                imports  @relation(fields: [import_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_13e503c4a1")
+
+  @@index([import_id], map: "index_import_rows_on_import_id")
+}
+
+model imports {
+  id                               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  column_mappings                  Json?
+  status                           String?       @db.VarChar
+  raw_file_str                     String?       @db.VarChar
+  normalized_csv_str               String?       @db.VarChar
+  created_at                       DateTime      @db.Timestamp(6)
+  updated_at                       DateTime      @db.Timestamp(6)
+  col_sep                          String?       @default(",") @db.VarChar
+  family_id                        String        @db.Uuid
+  account_id                       String?       @db.Uuid
+  type                             String        @db.VarChar
+  date_col_label                   String?       @db.VarChar
+  amount_col_label                 String?       @db.VarChar
+  name_col_label                   String?       @db.VarChar
+  category_col_label               String?       @db.VarChar
+  tags_col_label                   String?       @db.VarChar
+  account_col_label                String?       @db.VarChar
+  qty_col_label                    String?       @db.VarChar
+  ticker_col_label                 String?       @db.VarChar
+  price_col_label                  String?       @db.VarChar
+  entity_type_col_label            String?       @db.VarChar
+  notes_col_label                  String?       @db.VarChar
+  currency_col_label               String?       @db.VarChar
+  date_format                      String?       @default("%m/%d/%Y") @db.VarChar
+  signage_convention               String?       @default("inflows_positive") @db.VarChar
+  error                            String?       @db.VarChar
+  number_format                    String?       @db.VarChar
+  exchange_operating_mic_col_label String?       @db.VarChar
+  amount_type_strategy             String?       @default("signed_amount") @db.VarChar
+  amount_type_inflow_value         String?       @db.VarChar
+  accounts                         accounts[]
+  entries                          entries[]
+  import_rows                      import_rows[]
+  families                         families      @relation(fields: [family_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_fef4f8a5b1")
+
+  @@index([family_id], map: "index_imports_on_family_id")
+}
+
+model investments {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime @db.Timestamp(6)
+  updated_at        DateTime @db.Timestamp(6)
+  locked_attributes Json?    @default("{}")
+}
+
+model invitations {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email       String?   @db.VarChar
+  role        String?   @db.VarChar
+  token       String?   @unique(map: "index_invitations_on_token") @db.VarChar
+  family_id   String    @db.Uuid
+  inviter_id  String    @db.Uuid
+  accepted_at DateTime? @db.Timestamp(6)
+  expires_at  DateTime? @db.Timestamp(6)
+  created_at  DateTime  @db.Timestamp(6)
+  updated_at  DateTime  @db.Timestamp(6)
+  families    families  @relation(fields: [family_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_466d8d37e1")
+  users       users     @relation(fields: [inviter_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_7480156672")
+
+  @@unique([email, family_id], map: "index_invitations_on_email_and_family_id")
+  @@index([email], map: "index_invitations_on_email")
+  @@index([family_id], map: "index_invitations_on_family_id")
+  @@index([inviter_id], map: "index_invitations_on_inviter_id")
+}
+
+model invite_codes {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  token      String   @unique(map: "index_invite_codes_on_token") @db.VarChar
+  created_at DateTime @db.Timestamp(6)
+  updated_at DateTime @db.Timestamp(6)
+}
+
+model loans {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime @db.Timestamp(6)
+  updated_at        DateTime @db.Timestamp(6)
+  rate_type         String?  @db.VarChar
+  interest_rate     Decimal? @db.Decimal(10, 3)
+  term_months       Int?
+  initial_balance   Decimal? @db.Decimal(19, 4)
+  locked_attributes Json?    @default("{}")
+}
+
+model merchants {
+  id                   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                 String         @db.VarChar
+  color                String?        @db.VarChar
+  family_id            String?        @db.Uuid
+  created_at           DateTime       @db.Timestamp(6)
+  updated_at           DateTime       @db.Timestamp(6)
+  logo_url             String?        @db.VarChar
+  website_url          String?        @db.VarChar
+  type                 String         @db.VarChar
+  source               String?        @db.VarChar
+  provider_merchant_id String?        @db.VarChar
+  families             families?      @relation(fields: [family_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_ea5781c1b9")
+  transactions         transactions[]
+
+  @@index([family_id], map: "index_merchants_on_family_id")
+  @@index([type], map: "index_merchants_on_type")
+}
+
+model messages {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chat_id     String       @db.Uuid
+  type        String       @db.VarChar
+  status      String       @default("complete") @db.VarChar
+  content     String?
+  ai_model    String?      @db.VarChar
+  created_at  DateTime     @db.Timestamp(6)
+  updated_at  DateTime     @db.Timestamp(6)
+  debug       Boolean?     @default(false)
+  provider_id String?      @db.VarChar
+  reasoning   Boolean?     @default(false)
+  chats       chats        @relation(fields: [chat_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_0f670de7ba")
+  tool_calls  tool_calls[]
+
+  @@index([chat_id], map: "index_messages_on_chat_id")
+}
+
+model other_assets {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime @db.Timestamp(6)
+  updated_at        DateTime @db.Timestamp(6)
+  locked_attributes Json?    @default("{}")
+}
+
+model other_liabilities {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime @db.Timestamp(6)
+  updated_at        DateTime @db.Timestamp(6)
+  locked_attributes Json?    @default("{}")
+}
+
+model plaid_accounts {
+  id                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  plaid_item_id     String      @db.Uuid
+  plaid_id          String?     @db.VarChar
+  plaid_type        String?     @db.VarChar
+  plaid_subtype     String?     @db.VarChar
+  current_balance   Decimal?    @db.Decimal(19, 4)
+  available_balance Decimal?    @db.Decimal(19, 4)
+  currency          String?     @db.VarChar
+  name              String?     @db.VarChar
+  mask              String?     @db.VarChar
+  created_at        DateTime    @db.Timestamp(6)
+  updated_at        DateTime    @db.Timestamp(6)
+  accounts          accounts[]
+  plaid_items       plaid_items @relation(fields: [plaid_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_8fb63dd78c")
+
+  @@index([plaid_item_id], map: "index_plaid_accounts_on_plaid_item_id")
+}
+
+model plaid_items {
+  id                     String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  family_id              String           @db.Uuid
+  access_token           String?          @db.VarChar
+  plaid_id               String?          @db.VarChar
+  name                   String?          @db.VarChar
+  next_cursor            String?          @db.VarChar
+  scheduled_for_deletion Boolean?         @default(false)
+  created_at             DateTime         @db.Timestamp(6)
+  updated_at             DateTime         @db.Timestamp(6)
+  available_products     String[]         @default([]) @db.VarChar
+  billed_products        String[]         @default([]) @db.VarChar
+  last_synced_at         DateTime?        @db.Timestamp(6)
+  plaid_region           String           @default("us") @db.VarChar
+  institution_url        String?          @db.VarChar
+  institution_id         String?          @db.VarChar
+  institution_color      String?          @db.VarChar
+  status                 String           @default("good") @db.VarChar
+  plaid_accounts         plaid_accounts[]
+  families               families         @relation(fields: [family_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_9c72cf4f53")
+
+  @@index([family_id], map: "index_plaid_items_on_family_id")
+}
+
+model properties {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime @db.Timestamp(6)
+  updated_at        DateTime @db.Timestamp(6)
+  year_built        Int?
+  area_value        Int?
+  area_unit         String?  @db.VarChar
+  locked_attributes Json?    @default("{}")
+}
+
+model rejected_transfers {
+  id                                                                   String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  inflow_transaction_id                                                String       @db.Uuid
+  outflow_transaction_id                                               String       @db.Uuid
+  created_at                                                           DateTime     @db.Timestamp(6)
+  updated_at                                                           DateTime     @db.Timestamp(6)
+  transactions_rejected_transfers_outflow_transaction_idTotransactions transactions @relation("rejected_transfers_outflow_transaction_idTotransactions", fields: [outflow_transaction_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_2da6f89959")
+  transactions_rejected_transfers_inflow_transaction_idTotransactions  transactions @relation("rejected_transfers_inflow_transaction_idTotransactions", fields: [inflow_transaction_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_fbdaa55382")
+
+  @@unique([inflow_transaction_id, outflow_transaction_id], map: "idx_on_inflow_transaction_id_outflow_transaction_id_412f8e7e26")
+  @@index([inflow_transaction_id], map: "index_rejected_transfers_on_inflow_transaction_id")
+  @@index([outflow_transaction_id], map: "index_rejected_transfers_on_outflow_transaction_id")
+}
+
+model rule_actions {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rule_id     String   @db.Uuid
+  action_type String   @db.VarChar
+  value       String?  @db.VarChar
+  created_at  DateTime @db.Timestamp(6)
+  updated_at  DateTime @db.Timestamp(6)
+  rules       rules    @relation(fields: [rule_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_933d41413c")
+
+  @@index([rule_id], map: "index_rule_actions_on_rule_id")
+}
+
+model rule_conditions {
+  id                    String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rule_id               String?           @db.Uuid
+  parent_id             String?           @db.Uuid
+  condition_type        String            @db.VarChar
+  operator              String            @db.VarChar
+  value                 String?           @db.VarChar
+  created_at            DateTime          @db.Timestamp(6)
+  updated_at            DateTime          @db.Timestamp(6)
+  rule_conditions       rule_conditions?  @relation("rule_conditionsTorule_conditions", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_092decce7f")
+  other_rule_conditions rule_conditions[] @relation("rule_conditionsTorule_conditions")
+  rules                 rules?            @relation(fields: [rule_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_5f51cc0bd1")
+
+  @@index([parent_id], map: "index_rule_conditions_on_parent_id")
+  @@index([rule_id], map: "index_rule_conditions_on_rule_id")
+}
+
+model rules {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  family_id       String            @db.Uuid
+  resource_type   String            @db.VarChar
+  effective_date  DateTime?         @db.Date
+  active          Boolean           @default(false)
+  created_at      DateTime          @db.Timestamp(6)
+  updated_at      DateTime          @db.Timestamp(6)
+  rule_actions    rule_actions[]
+  rule_conditions rule_conditions[]
+  families        families          @relation(fields: [family_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_e4bc52f9b6")
+
+  @@index([family_id], map: "index_rules_on_family_id")
+}
+
+model schema_migrations {
+  version String @id @db.VarChar
+}
+
+model securities {
+  id                     String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticker                 String            @db.VarChar
+  name                   String?           @db.VarChar
+  created_at             DateTime          @db.Timestamp(6)
+  updated_at             DateTime          @db.Timestamp(6)
+  country_code           String?           @db.VarChar
+  exchange_mic           String?           @db.VarChar
+  exchange_acronym       String?           @db.VarChar
+  logo_url               String?           @db.VarChar
+  exchange_operating_mic String?           @db.VarChar
+  holdings               holdings[]
+  security_prices        security_prices[]
+  trades                 trades[]
+
+  @@unique([ticker, exchange_operating_mic], map: "index_securities_on_ticker_and_exchange_operating_mic")
+  @@index([country_code], map: "index_securities_on_country_code")
+  @@index([exchange_operating_mic], map: "index_securities_on_exchange_operating_mic")
+}
+
+model security_prices {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date        DateTime    @db.Date
+  price       Decimal     @db.Decimal(19, 4)
+  currency    String      @default("USD") @db.VarChar
+  created_at  DateTime    @db.Timestamp(6)
+  updated_at  DateTime    @db.Timestamp(6)
+  security_id String?     @db.Uuid
+  securities  securities? @relation(fields: [security_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_fb42b7e597")
+
+  @@unique([security_id, date, currency], map: "index_security_prices_on_security_id_and_date_and_currency")
+  @@index([security_id], map: "index_security_prices_on_security_id")
+}
+
+model sessions {
+  id                             String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                        String                  @db.Uuid
+  user_agent                     String?                 @db.VarChar
+  ip_address                     String?                 @db.VarChar
+  created_at                     DateTime                @db.Timestamp(6)
+  updated_at                     DateTime                @db.Timestamp(6)
+  active_impersonator_session_id String?                 @db.Uuid
+  subscribed_at                  DateTime?               @db.Timestamp(6)
+  prev_transaction_page_params   Json?                   @default("{}")
+  impersonation_sessions         impersonation_sessions? @relation(fields: [active_impersonator_session_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_738834d772")
+  users                          users                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_758836b4f0")
+
+  @@index([active_impersonator_session_id], map: "index_sessions_on_active_impersonator_session_id")
+  @@index([user_id], map: "index_sessions_on_user_id")
+}
+
+model settings {
+  id         BigInt   @id @default(autoincrement())
+  var        String   @unique(map: "index_settings_on_var") @db.VarChar
+  value      String?
+  created_at DateTime @db.Timestamp(6)
+  updated_at DateTime @db.Timestamp(6)
+}
+
+model stock_exchanges {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String   @db.VarChar
+  acronym           String?  @db.VarChar
+  mic               String   @db.VarChar
+  country           String   @db.VarChar
+  country_code      String   @db.VarChar
+  city              String?  @db.VarChar
+  website           String?  @db.VarChar
+  timezone_name     String?  @db.VarChar
+  timezone_abbr     String?  @db.VarChar
+  timezone_abbr_dst String?  @db.VarChar
+  currency_code     String?  @db.VarChar
+  currency_symbol   String?  @db.VarChar
+  currency_name     String?  @db.VarChar
+  created_at        DateTime @db.Timestamp(6)
+  updated_at        DateTime @db.Timestamp(6)
+
+  @@index([country], map: "index_stock_exchanges_on_country")
+  @@index([country_code], map: "index_stock_exchanges_on_country_code")
+  @@index([currency_code], map: "index_stock_exchanges_on_currency_code")
+}
+
+model syncs {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  syncable_type   String    @db.VarChar
+  syncable_id     String    @db.Uuid
+  last_ran_at     DateTime? @db.Timestamp(6)
+  start_date      DateTime? @db.Date
+  status          String?   @default("pending") @db.VarChar
+  error           String?   @db.VarChar
+  data            Json?
+  created_at      DateTime  @db.Timestamp(6)
+  updated_at      DateTime  @db.Timestamp(6)
+  error_backtrace String[]
+  parent_id       String?   @db.Uuid
+  syncs           syncs?    @relation("syncsTosyncs", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_ac338208d1")
+  other_syncs     syncs[]   @relation("syncsTosyncs")
+
+  @@index([parent_id], map: "index_syncs_on_parent_id")
+  @@index([syncable_type, syncable_id], map: "index_syncs_on_syncable")
+}
+
+model taggings {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tag_id        String   @db.Uuid
+  taggable_type String?  @db.VarChar
+  taggable_id   String?  @db.Uuid
+  created_at    DateTime @db.Timestamp(6)
+  updated_at    DateTime @db.Timestamp(6)
+  tags          tags     @relation(fields: [tag_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_9fcd2e236b")
+
+  @@index([tag_id], map: "index_taggings_on_tag_id")
+  @@index([taggable_type, taggable_id], map: "index_taggings_on_taggable")
+}
+
+model tags {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String?    @db.VarChar
+  color      String     @default("#e99537") @db.VarChar
+  family_id  String     @db.Uuid
+  created_at DateTime   @db.Timestamp(6)
+  updated_at DateTime   @db.Timestamp(6)
+  taggings   taggings[]
+  families   families   @relation(fields: [family_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_c7b66bad79")
+
+  @@index([family_id], map: "index_tags_on_family_id")
+}
+
+model tool_calls {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  message_id         String   @db.Uuid
+  provider_id        String   @db.VarChar
+  provider_call_id   String?  @db.VarChar
+  type               String   @db.VarChar
+  function_name      String?  @db.VarChar
+  function_arguments Json?
+  function_result    Json?
+  created_at         DateTime @db.Timestamp(6)
+  updated_at         DateTime @db.Timestamp(6)
+  messages           messages @relation(fields: [message_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_9c8daee481")
+
+  @@index([message_id], map: "index_tool_calls_on_message_id")
+}
+
+model trades {
+  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  security_id       String     @db.Uuid
+  qty               Decimal?   @db.Decimal(19, 4)
+  price             Decimal?   @db.Decimal(19, 4)
+  created_at        DateTime   @db.Timestamp(6)
+  updated_at        DateTime   @db.Timestamp(6)
+  currency          String?    @db.VarChar
+  locked_attributes Json?      @default("{}")
+  securities        securities @relation(fields: [security_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_89e7d6c7d0")
+
+  @@index([security_id], map: "index_trades_on_security_id")
+}
+
+model transactions {
+  id                                                                         String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at                                                                 DateTime             @db.Timestamp(6)
+  updated_at                                                                 DateTime             @db.Timestamp(6)
+  category_id                                                                String?              @db.Uuid
+  merchant_id                                                                String?              @db.Uuid
+  locked_attributes                                                          Json?                @default("{}")
+  plaid_category                                                             String?              @db.VarChar
+  plaid_category_detailed                                                    String?              @db.VarChar
+  rejected_transfers_rejected_transfers_outflow_transaction_idTotransactions rejected_transfers[] @relation("rejected_transfers_outflow_transaction_idTotransactions")
+  rejected_transfers_rejected_transfers_inflow_transaction_idTotransactions  rejected_transfers[] @relation("rejected_transfers_inflow_transaction_idTotransactions")
+  categories                                                                 categories?          @relation(fields: [category_id], references: [id], onUpdate: NoAction, map: "fk_rails_0ea2ad3927")
+  merchants                                                                  merchants?           @relation(fields: [merchant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_3e4f7da228")
+  transfers_transfers_outflow_transaction_idTotransactions                   transfers[]          @relation("transfers_outflow_transaction_idTotransactions")
+  transfers_transfers_inflow_transaction_idTotransactions                    transfers[]          @relation("transfers_inflow_transaction_idTotransactions")
+
+  @@index([category_id], map: "index_transactions_on_category_id")
+  @@index([merchant_id], map: "index_transactions_on_merchant_id")
+}
+
+model transfers {
+  id                                                          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  inflow_transaction_id                                       String       @db.Uuid
+  outflow_transaction_id                                      String       @db.Uuid
+  status                                                      String       @default("pending") @db.VarChar
+  notes                                                       String?
+  created_at                                                  DateTime     @db.Timestamp(6)
+  updated_at                                                  DateTime     @db.Timestamp(6)
+  transactions_transfers_outflow_transaction_idTotransactions transactions @relation("transfers_outflow_transaction_idTotransactions", fields: [outflow_transaction_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_rails_9d957b82f0")
+  transactions_transfers_inflow_transaction_idTotransactions  transactions @relation("transfers_inflow_transaction_idTotransactions", fields: [inflow_transaction_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_rails_b7f6b2cde7")
+
+  @@unique([inflow_transaction_id, outflow_transaction_id], map: "idx_on_inflow_transaction_id_outflow_transaction_id_8cd07a28bd")
+  @@index([inflow_transaction_id], map: "index_transfers_on_inflow_transaction_id")
+  @@index([outflow_transaction_id], map: "index_transfers_on_outflow_transaction_id")
+}
+
+model users {
+  id                                                                   String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  family_id                                                            String                   @db.Uuid
+  first_name                                                           String?                  @db.VarChar
+  last_name                                                            String?                  @db.VarChar
+  email                                                                String?                  @unique(map: "index_users_on_email") @db.VarChar
+  password_digest                                                      String?                  @db.VarChar
+  created_at                                                           DateTime                 @db.Timestamp(6)
+  updated_at                                                           DateTime                 @db.Timestamp(6)
+  role                                                                 String                   @default("member") @db.VarChar
+  active                                                               Boolean                  @default(true)
+  onboarded_at                                                         DateTime?                @db.Timestamp(6)
+  unconfirmed_email                                                    String?                  @db.VarChar
+  otp_secret                                                           String?                  @db.VarChar
+  otp_required                                                         Boolean                  @default(false)
+  otp_backup_codes                                                     String[]                 @default([]) @db.VarChar
+  show_sidebar                                                         Boolean?                 @default(true)
+  default_period                                                       String                   @default("last_30_days") @db.VarChar
+  last_viewed_chat_id                                                  String?                  @db.Uuid
+  show_ai_sidebar                                                      Boolean?                 @default(true)
+  ai_enabled                                                           Boolean                  @default(false)
+  theme                                                                String?                  @default("system") @db.VarChar
+  rule_prompts_disabled                                                Boolean?                 @default(false)
+  rule_prompt_dismissed_at                                             DateTime?                @db.Timestamp(6)
+  goals                                                                String[]                 @default([])
+  set_onboarding_preferences_at                                        DateTime?                @db.Timestamp(6)
+  set_onboarding_goals_at                                              DateTime?                @db.Timestamp(6)
+  chats_chats_user_idTousers                                           chats[]                  @relation("chats_user_idTousers")
+  impersonation_sessions_impersonation_sessions_impersonator_idTousers impersonation_sessions[] @relation("impersonation_sessions_impersonator_idTousers")
+  impersonation_sessions_impersonation_sessions_impersonated_idTousers impersonation_sessions[] @relation("impersonation_sessions_impersonated_idTousers")
+  invitations                                                          invitations[]
+  sessions                                                             sessions[]
+  chats_users_last_viewed_chat_idTochats                               chats?                   @relation("users_last_viewed_chat_idTochats", fields: [last_viewed_chat_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_33a7580ab9")
+  families                                                             families                 @relation(fields: [family_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_87dbf420c1")
+
+  @@index([family_id], map: "index_users_on_family_id")
+  @@index([last_viewed_chat_id], map: "index_users_on_last_viewed_chat_id")
+}
+
+model valuations {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime @db.Timestamp(6)
+  updated_at        DateTime @db.Timestamp(6)
+  locked_attributes Json?    @default("{}")
+}
+
+model vehicles {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime @db.Timestamp(6)
+  updated_at        DateTime @db.Timestamp(6)
+  year              Int?
+  mileage_value     Int?
+  mileage_unit      String?  @db.VarChar
+  make              String?  @db.VarChar
+  model             String?  @db.VarChar
+  locked_attributes Json?    @default("{}")
+}
+
+model subscriptions {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  family_id              String    @db.Uuid
+  status                 String    @db.VarChar
+  stripe_id              String?   @db.VarChar
+  amount                 Decimal?  @db.Decimal(19, 4)
+  currency               String?   @db.VarChar
+  interval               String?   @db.VarChar
+  current_period_ends_at DateTime? @db.Timestamp(6)
+  trial_ends_at          DateTime? @db.Timestamp(6)
+  created_at             DateTime  @db.Timestamp(6)
+  updated_at             DateTime  @db.Timestamp(6)
+  families               families  @relation(fields: [family_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rails_d8acfbffc8")
+
+  @@index([family_id], map: "index_subscriptions_on_family_id")
+}
+
+enum account_status {
+  ok
+  syncing
+  error
+}
