@@ -23,9 +23,12 @@ log.info("Logged in");
 
 const accounts = await client.fetchAccounts(env.PLUGGY_CONNECTOR_ID);
 
-log.info("Fetched accounts", {
-	total: accounts.results.length,
-});
+log.info(
+	{
+		total: accounts.results.length,
+	},
+	"Fetched accounts",
+);
 
 for (const account of accounts.results) {
 	if (account.subtype !== "CHECKING_ACCOUNT") continue;
@@ -37,9 +40,12 @@ for (const account of accounts.results) {
 			page,
 		});
 
-		log.info("Fetched transactions", {
-			total: transactions.results.length,
-		});
+		log.info(
+			{
+				total: transactions.results.length,
+			},
+			"Fetched transactions",
+		);
 
 		for (const {
 			id,
@@ -54,7 +60,18 @@ for (const account of accounts.results) {
 				},
 			});
 
-			if (entry) continue;
+			if (entry) {
+				log.info(
+					{
+						date,
+						type,
+						id,
+					},
+					"Skipping",
+				);
+
+				continue;
+			}
 
 			log.info(
 				{
@@ -75,11 +92,14 @@ for (const account of accounts.results) {
 				notes: id,
 			});
 
-			log.info("Created transaction", {
-				date,
-				type,
-				id,
-			});
+			log.info(
+				{
+					date,
+					type,
+					id,
+				},
+				"Created transaction",
+			);
 		}
 
 		if (transactions.totalPages === page) break;
@@ -87,7 +107,10 @@ for (const account of accounts.results) {
 		page++;
 	}
 
-	log.info("Finished", {
-		accountId: account.id,
-	});
+	log.info(
+		{
+			accountId: account.id,
+		},
+		"Finished",
+	);
 }
